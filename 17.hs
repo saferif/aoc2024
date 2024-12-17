@@ -1,0 +1,44 @@
+import Control.Monad (void)
+import Data.Bits (shift, xor, (.&.))
+import Data.List (intercalate)
+import Text.Parsec.String (Parser)
+import Text.Parsec (runParser, string, digit, many1, sepBy1, char)
+
+parseInput :: Parser (Int, Int, Int, [Int])
+parseInput = do
+    void $ string "Register A: "
+    a <- many1 digit
+    void $ char '\n'
+    void $ string "Register B: "
+    b <- many1 digit
+    void $ char '\n'
+    void $ string "Register C: "
+    c <- many1 digit
+    void $ char '\n'
+    void $ char '\n'
+    void $ string "Program: "
+    prog <- sepBy1 (many1 digit) (char ',')
+    return (read a, read b, read c, fmap read prog)
+
+combo :: Int -> Int -> Int -> Int -> Int
+combo a b c x
+    | x >= 0 && x <= 3 = x
+    | x == 4 = a
+    | x == 5 = b
+    | x == 6 = c
+
+run :: [Int] -> [Int] -> Int -> Int -> Int -> [Int]
+run orig [] a b c = []
+run orig (0:arg:rest) a b c = run orig rest (shift a (negate $ combo a b c arg)) b c
+run orig (1:arg:rest) a b c = run orig rest a (xor b arg) c
+run orig (2:arg:rest) a b c = run orig rest a ((combo a b c arg) .&. 7) c
+run orig (3:arg:rest) a b c = if a == 0 then (run orig rest a b c) else (run orig (drop arg orig) a b c)
+run orig (4:_:rest) a b c = run orig rest a (xor b c) c
+run orig (5:arg:rest) a b c = ((combo a b c arg) .&. 7) : (run orig rest a b c)
+run orig (6:arg:rest) a b c = run orig rest a (shift a (negate $ combo a b c arg)) c
+run orig (7:arg:rest) a b c = run orig rest a b (shift a (negate $ combo a b c arg))
+
+main = do
+    text <- getContents
+    let (Right (a, b, c, prog)) = runParser parseInput () "" text
+    putStr $ intercalate "," $ fmap show $ run prog prog a b c
